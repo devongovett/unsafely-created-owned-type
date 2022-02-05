@@ -1,11 +1,10 @@
+// Example Usage
+// =============
+
 fn main() {
     let string = String::from(" olá. ");
     let owned_sheet = StyleSheetBuf::new(string);
-
     print_parsed(&owned_sheet);
-    println!("Will drop...");
-    drop(owned_sheet);
-    println!("Finished drop.");
 }
 
 fn print_parsed(sheet: &StyleSheet) {
@@ -18,7 +17,8 @@ fn parse_file(path: &str) -> StyleSheetBuf {
     StyleSheetBuf::new(source)
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementation
+// ==============
 
 struct StyleSheetBuf {
     source_ptr: *mut String,
@@ -29,19 +29,22 @@ struct StyleSheetBuf {
 }
 
 impl StyleSheetBuf {
-    // "Safely" (?) creates a new `StyleSheetBuf`. To do so, we require an owned string type which
-    // will then be "leaked" after moving it to the heap. This is safe because since we own it it
-    // should never be dropped without our consent.
-    //
-    // We then get a raw pointer and use it to get a static reference, which is used to create a
-    // "normal" style sheet. Such reference is, of course, static. This means that it may live up
-    // until the end of the program.
+    /// Creates a new `StyleSheetBuf`.
     pub fn new(source: String) -> StyleSheetBuf {
+        // First move the string to the heap so one may then "leak" it and get a static reference.
         let boxed_source = Box::new(source);
+
+        // Returns a raw pointer to the underlying string. This also prevents the `Box`'s
+        // destructor to be executed after this method ends. As such our string type will live until
+        // one explicitly drops it.
         let source_ptr = Box::into_raw(boxed_source);
 
-        // SAFETY: The deref is safe since we just obtained the pointer by using `into_raw`,
-        // which must return a "safe" pointer that fulfills all the deref requirements.
+        // The pointer is then used to get a `&'static str`, which will then be used to create the
+        // underlying `StyleSheet`.
+        //
+        // SAFETY: The following deref is safe since the pointer was just obtained by using the
+        // `Box::into_raw` method, which must return a "safe" pointer that fulfills all the deref
+        // requirements.
         let str_ref: &'static str = unsafe { (*source_ptr).as_str() };
 
         let sheet = StyleSheet::parse(str_ref);
@@ -51,32 +54,29 @@ impl StyleSheetBuf {
         }
     }
 
-    // Self explanatory.
+    /// Returns a reference to the underlying `StyleSheet<'static>`.
     pub fn sheet(&self) -> &StyleSheet<'static> {
-        // SAFETY: `self.sheet` only is `None` within `StyleSheetBuf`'s destructor.
-        unsafe { self.sheet.as_ref().unwrap_unchecked() }
+        // Since here there is no way `self.sheet` to be `None`, if performance is critical, one
+        // might use the unsafe `unwrap_unchecked` method instead.
+        self.sheet.as_ref().unwrap()
     }
 }
 
-// "Safely" (?) drop it.
 impl Drop for StyleSheetBuf {
     fn drop(&mut self) {
-        // Ensures the underlying `StyleSheet` is dropped before the string is dropped. This is
-        // needed to avoid an use after free in the case of `StyleSheet` defining its own destructor
-        // which could then use the string we need to drop next.
+        // Ensures the underlying `StyleSheet` is dropped before the string is freed. This is
+        // needed to avoid a use after free in the case of `StyleSheet` defining its own destructor
+        // which could then use the string.
         drop(self.sheet.take());
         // The `self.sheet` field is now `None`, which means that `StyleSheet`s destructor won't be
-        // executed again. It is now safe to clean up the string.
+        // executed again. It is now safe to free the string.
 
-        println!("  Will drop StyleSheetBuf...");
-
-        // SAFETY: It is safe because there is no way to drop such pointer before (i.e. a double
-        // free can't happen) and the pointer wasn't modified since its creation by `into_raw`.
+        // SAFETY: This is safe. A double free can't happen here since Rust guarantees that `drop`
+        // is executed only once. The pointer is also valid since it wasn't modified since its
+        // creation by `Box::into_raw`.
         unsafe {
             drop(Box::from_raw(self.source_ptr));
         }
-
-        println!("    Done.");
     }
 }
 
@@ -89,7 +89,6 @@ impl std::ops::Deref for StyleSheetBuf {
 }
 
 struct StyleSheet<'s> {
-    // Just keep some reference.
     parsed: &'s str,
 }
 
@@ -103,8 +102,6 @@ impl<'s> StyleSheet<'s> {
 
 impl Drop for StyleSheet<'_> {
     fn drop(&mut self) {
-        println!("  Will drop StyleSheet:");
-        println!("    Just making a final read... -> {:?}", self.parsed);
-        println!("    Done.");
+        // This code may safely use `self.parsed`.
     }
 }
