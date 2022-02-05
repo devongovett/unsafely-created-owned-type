@@ -1,5 +1,8 @@
 struct StyleSheetBuf {
     source_ptr: *mut String,
+
+    // Why use an option here? See:
+    // https://doc.rust-lang.org/nomicon/destructors.html
     sheet: Option<StyleSheet<'static>>,
 }
 
@@ -40,6 +43,8 @@ impl Drop for StyleSheetBuf {
         // needed to avoid an use after free in the case of `StyleSheet` defining its own destructor
         // which could then use the string we need to drop next.
         drop(self.sheet.take());
+        // The `self.sheet` field is now `None`, which means that `StyleSheet`s destructor won't be
+        // executed again. It is now safe to clean up the string.
 
         println!("  Will drop StyleSheetBuf...");
 
