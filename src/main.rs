@@ -1,6 +1,6 @@
 struct StyleSheetBuf {
     source_ptr: *mut String,
-    sheet: StyleSheet<'static>,
+    sheet: Option<StyleSheet<'static>>,
 }
 
 impl StyleSheetBuf {
@@ -20,23 +20,36 @@ impl StyleSheetBuf {
         let str_ref: &'static str = unsafe { (*source_ptr).as_str() };
 
         let sheet = StyleSheet::parse(str_ref);
-        StyleSheetBuf { source_ptr, sheet }
+        StyleSheetBuf {
+            source_ptr,
+            sheet: Some(sheet),
+        }
     }
 
     // Self explanatory.
     pub fn sheet(&self) -> &StyleSheet<'static> {
-        &self.sheet
+        // SAFETY: `self.sheet` only is `None` within `StyleSheetBuf`'s destructor.
+        unsafe { self.sheet.as_ref().unwrap_unchecked() }
     }
 }
 
 // "Safely" (?) drop it.
 impl Drop for StyleSheetBuf {
     fn drop(&mut self) {
+        // Ensures the underlying `StyleSheet` is dropped before the string is dropped. This is
+        // needed to avoid an use after free in the case of `StyleSheet` defining its own destructor
+        // which could then use the string we need to drop next.
+        drop(self.sheet.take());
+
+        println!("  Will drop StyleSheetBuf...");
+
         // SAFETY: It is safe because there is no way to drop such pointer before (i.e. a double
         // free can't happen) and the pointer wasn't modified since its creation by `into_raw`.
         unsafe {
             drop(Box::from_raw(self.source_ptr));
         }
+
+        println!("    Done.");
     }
 }
 
@@ -61,15 +74,29 @@ impl<'s> StyleSheet<'s> {
     }
 }
 
+impl Drop for StyleSheet<'_> {
+    fn drop(&mut self) {
+        println!("  Will drop StyleSheet:");
+        println!("    Just making a final read... -> {:?}", self.parsed);
+        println!("    Done.");
+    }
+}
+
 fn main() {
-    let foo: StyleSheetBuf = parse_file("foo.txt");
-    print_parsed(&foo);
+    let string = String::from(" olá. ");
+    let owned_sheet = StyleSheetBuf::new(string);
+
+    print_parsed(&owned_sheet);
+    println!("Will drop...");
+    drop(owned_sheet);
+    println!("Finished drop.");
 }
 
 fn print_parsed(sheet: &StyleSheet) {
     println!("parsed: {:?}", sheet.parsed);
 }
 
+#[allow(dead_code)]
 fn parse_file(path: &str) -> StyleSheetBuf {
     let source = std::fs::read_to_string(path).unwrap();
     StyleSheetBuf::new(source)
