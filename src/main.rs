@@ -4,12 +4,12 @@ struct StyleSheetBuf {
 }
 
 impl StyleSheetBuf {
-    // "Safely" (?) creates a new `StyleSheetBuf`. To do so we require an owned string type which
+    // "Safely" (?) creates a new `StyleSheetBuf`. To do so, we require an owned string type which
     // will then be "leaked" after moving it to the heap. This is safe because since we own it it
     // should never be dropped without our consent.
     //
-    // We then get a raw pointer and use it to get a static reference, which we then use to create
-    // a normal style sheet. Such reference is, of course, static. This means that it may live up
+    // We then get a raw pointer and use it to get a static reference, which is used to create a
+    // "normal" style sheet. Such reference is, of course, static. This means that it may live up
     // until the end of the program.
     pub fn new(source: String) -> StyleSheetBuf {
         let boxed_source = Box::new(source);
@@ -62,7 +62,7 @@ impl<'s> StyleSheet<'s> {
 }
 
 fn main() {
-    let foo = parse_file("foo.txt");
+    let foo: StyleSheetBuf = parse_file("foo.txt");
     print_parsed(&foo);
 }
 
