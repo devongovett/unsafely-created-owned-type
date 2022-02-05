@@ -1,3 +1,25 @@
+fn main() {
+    let string = String::from(" olá. ");
+    let owned_sheet = StyleSheetBuf::new(string);
+
+    print_parsed(&owned_sheet);
+    println!("Will drop...");
+    drop(owned_sheet);
+    println!("Finished drop.");
+}
+
+fn print_parsed(sheet: &StyleSheet) {
+    println!("parsed: {:?}", sheet.parsed);
+}
+
+#[allow(dead_code)]
+fn parse_file(path: &str) -> StyleSheetBuf {
+    let source = std::fs::read_to_string(path).unwrap();
+    StyleSheetBuf::new(source)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct StyleSheetBuf {
     source_ptr: *mut String,
 
@@ -85,24 +107,4 @@ impl Drop for StyleSheet<'_> {
         println!("    Just making a final read... -> {:?}", self.parsed);
         println!("    Done.");
     }
-}
-
-fn main() {
-    let string = String::from(" olá. ");
-    let owned_sheet = StyleSheetBuf::new(string);
-
-    print_parsed(&owned_sheet);
-    println!("Will drop...");
-    drop(owned_sheet);
-    println!("Finished drop.");
-}
-
-fn print_parsed(sheet: &StyleSheet) {
-    println!("parsed: {:?}", sheet.parsed);
-}
-
-#[allow(dead_code)]
-fn parse_file(path: &str) -> StyleSheetBuf {
-    let source = std::fs::read_to_string(path).unwrap();
-    StyleSheetBuf::new(source)
 }
