@@ -2,13 +2,14 @@
 // =============
 
 fn main() {
-    let string = String::from(" olá. ");
-    let owned_sheet = StyleSheetBuf::new(string);
-    print_parsed(&owned_sheet);
+   let parsed = get_parsed();
+   println!("{}", parsed.val);
 }
 
-fn print_parsed(sheet: &StyleSheet) {
-    println!("parsed: {:?}", sheet.parsed);
+fn get_parsed() -> Parsed<'static> {
+    let string = std::fs::read_to_string("x.txt").unwrap();
+    let owned_sheet = StyleSheetBuf::new(string);
+    owned_sheet.parsed.clone()
 }
 
 #[allow(dead_code)]
@@ -89,13 +90,15 @@ impl std::ops::Deref for StyleSheetBuf {
 }
 
 struct StyleSheet<'s> {
-    parsed: &'s str,
+    parsed: Parsed<'s>,
 }
 
 impl<'s> StyleSheet<'s> {
     pub fn parse(source: &'s str) -> Self {
         StyleSheet {
-            parsed: source.trim(),
+            parsed: Parsed {
+                val: source.trim()
+            },
         }
     }
 }
@@ -104,4 +107,9 @@ impl Drop for StyleSheet<'_> {
     fn drop(&mut self) {
         // This code may safely use `self.parsed`.
     }
+}
+
+#[derive(Clone)]
+struct Parsed<'s> {
+    val: &'s str,
 }
